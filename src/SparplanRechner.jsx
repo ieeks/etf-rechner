@@ -8,29 +8,23 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-// Birchline palette
-const CLAY = "#D97757";
-const CLAY_SOFT = "#E9A488";
-const SLATE = "#141413";
-const IVORY = "#FAF9F5";
-const OAT = "#E3DACC";
-const OAT_DEEP = "#CFC2AC";
-const MUTED = "#6B6458";
-const AMBER = "#B0701A";
-
-const KEST = 0.275; // Österreich: Kapitalertragsteuer
-
-const eur0 = new Intl.NumberFormat("de-AT", {
-  style: "currency",
-  currency: "EUR",
-  maximumFractionDigits: 0,
-});
-const eur2 = new Intl.NumberFormat("de-AT", {
-  style: "currency",
-  currency: "EUR",
-  maximumFractionDigits: 2,
-});
+import {
+  CLAY,
+  CLAY_SOFT,
+  SLATE,
+  IVORY,
+  OAT,
+  OAT_DEEP,
+  MUTED,
+  AMBER,
+  KEST,
+  eur0,
+  sliderStyle,
+  Field,
+  Toggle,
+  MiniStat,
+  Corners,
+} from "./shared.jsx";
 
 const CORE_ETFS = [
   {
@@ -123,47 +117,6 @@ function simulate({ rate, years, annualReturn, feePerExec, plans, lump = 0 }) {
   return { series, totalPaid, totalInvested, totalFees, endValue, gain, kest, netEnd, months };
 }
 
-function Stat({ label, value, accent, big }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ fontSize: 12, letterSpacing: 0.3, color: MUTED, textTransform: "uppercase" }}>
-        {label}
-      </span>
-      <span
-        style={{
-          fontSize: big ? 34 : 19,
-          fontWeight: big ? 800 : 700,
-          color: accent || SLATE,
-          fontVariantNumeric: "tabular-nums",
-          lineHeight: 1.1,
-        }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function Field({ label, hint, children, value }) {
-  return (
-    <div style={{ marginBottom: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-        <label style={{ fontSize: 14, fontWeight: 600, color: SLATE }}>{label}</label>
-        <span style={{ fontSize: 15, fontWeight: 800, color: CLAY, fontVariantNumeric: "tabular-nums" }}>{value}</span>
-      </div>
-      {children}
-      {hint && <div style={{ fontSize: 11.5, color: MUTED, marginTop: 5 }}>{hint}</div>}
-    </div>
-  );
-}
-
-const sliderStyle = {
-  width: "100%",
-  accentColor: CLAY,
-  height: 26,
-  cursor: "pointer",
-};
-
 export default function SparplanRechner() {
   const [rate, setRate] = useState(150);
   const [lump, setLump] = useState(0);
@@ -228,29 +181,8 @@ export default function SparplanRechner() {
   const shownEnd = afterTax ? r.netEnd : r.endValue;
   const perChild = shownEnd / plans;
 
-  const corner = (pos) => {
-    const base = { position: "absolute", width: 9, height: 9, borderColor: CLAY };
-    const map = {
-      tl: { top: 8, left: 8, borderTop: "2px solid", borderLeft: "2px solid" },
-      tr: { top: 8, right: 8, borderTop: "2px solid", borderRight: "2px solid" },
-      bl: { bottom: 8, left: 8, borderBottom: "2px solid", borderLeft: "2px solid" },
-      br: { bottom: 8, right: 8, borderBottom: "2px solid", borderRight: "2px solid" },
-    };
-    return <span style={{ ...base, ...map[pos] }} />;
-  };
-
   return (
-    <div
-      style={{
-        background: IVORY,
-        minHeight: "100vh",
-        padding: "22px 16px 40px",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-        color: SLATE,
-      }}
-    >
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 11, letterSpacing: 1.5, color: CLAY, fontWeight: 700, textTransform: "uppercase" }}>
@@ -329,7 +261,7 @@ export default function SparplanRechner() {
             marginBottom: 20,
           }}
         >
-          {corner("tl")}{corner("tr")}{corner("bl")}{corner("br")}
+          <Corners />
           <div style={{ fontSize: 12, letterSpacing: 0.4, color: CLAY_SOFT, textTransform: "uppercase", fontWeight: 700 }}>
             Endkapital {afterTax ? "netto (nach KESt)" : "brutto"} nach {years} Jahren
           </div>
@@ -477,7 +409,6 @@ export default function SparplanRechner() {
           schwanken stark und können negativ sein; vergangene Wertentwicklung ist keine Garantie. Inflation ist
           nicht berücksichtigt.
         </p>
-      </div>
     </div>
   );
 }
@@ -598,36 +529,3 @@ function SubHead({ children }) {
   );
 }
 
-function MiniStat({ label, value, color }) {
-  return (
-    <div>
-      <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 0.3 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function Toggle({ on, onClick, label }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        border: `2px solid ${on ? CLAY : OAT_DEEP}`,
-        background: on ? CLAY : "#fff",
-        color: on ? "#fff" : MUTED,
-        borderRadius: 999,
-        padding: "7px 14px",
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: "pointer",
-        transition: "all .12s",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
