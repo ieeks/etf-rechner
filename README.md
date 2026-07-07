@@ -1,6 +1,6 @@
-# ETF-Sparplan-Rechner
+# ETF-Rechner — Ansparen & Entnehmen
 
-Interaktiver Sparplan-Rechner für ETF-Investments via flatex Österreich — optimiert für Eltern, die Vermögen für Kinder aufbauen.
+Interaktiver ETF-Rechner für Österreich mit zwei umschaltbaren Modi: **Ansparen** (Vermögen aufbauen) und **Entnehmen** (vom Depot leben). Optimiert für flatex-Anleger.
 
 **Live:** https://ieeks.github.io/etf-rechner/
 
@@ -8,6 +8,7 @@ Interaktiver Sparplan-Rechner für ETF-Investments via flatex Österreich — op
 
 ## Features
 
+### Ansparen (Sparplan-Rechner)
 - **Sparrate & Einmalanlage** — frei einstellbar per Slider
 - **Rendite-Szenarien** — Vergleich bei 4 %, 6 % und 8 % p.a.
 - **KESt-Berechnung** — 27,5 % Kapitalertragsteuer (Österreich) ein-/ausblendbar
@@ -15,6 +16,13 @@ Interaktiver Sparplan-Rechner für ETF-Investments via flatex Österreich — op
 - **Gebührenrechnung** — Gratis-ETF (0 €) vs. 1,50 € pro Ausführung
 - **Flächendiagramm** — Einzahlungen vs. Depotwert über die Zeit (recharts)
 - **ETF-Empfehlungen** — kuratierte Liste mit ISIN-Kopieren per Klick
+
+### Entnehmen (Entnahmeplan-Rechner)
+- **Zwei Modi** — **Kapitalerhalt** (nur den realen Ertrag entnehmen, Substanz bleibt erhalten) und **Kapitalverzehr** (Depot planmäßig über X Jahre aufbrauchen)
+- **Inflationsbereinigt** — alle Auszahlungen in heutiger Kaufkraft; nominale Rate steigt jährlich mit der Inflation
+- **KESt auf den Ertragsanteil** — vereinfachte 27,5-%-Besteuerung der Entnahmen
+- **Depotverlauf** — nominal vs. real im Flächendiagramm
+- **Rendite-Szenarien** — mögliche Monatsentnahme bei 4 %, 6 % und 8 % p.a.
 
 ## ETF-Auswahl
 
@@ -58,4 +66,4 @@ Bei jedem Push auf `main` baut GitHub Actions die App und deployt sie automatisc
 
 ---
 
-> **Hinweis:** Vereinfachte Modellrechnung, keine Anlageberatung. Renditen können negativ sein; vergangene Wertentwicklung ist keine Garantie. Inflation ist nicht berücksichtigt.
+> **Hinweis:** Vereinfachte Modellrechnung, keine Anlageberatung. Renditen können negativ sein; vergangene Wertentwicklung ist keine Garantie. Der Sparplan-Rechner berücksichtigt keine Inflation; der Entnahmeplan-Rechner rechnet inflationsbereinigt in heutiger Kaufkraft.
