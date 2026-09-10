@@ -10,6 +10,13 @@ export const AMBER = "#B0701A";
 
 export const KEST = 0.275; // Österreich: Kapitalertragsteuer
 
+/**
+ * Effektiver Monatszins aus einer effektiven Jahresrendite.
+ * Beide Rechner verwenden dieselbe Umrechnung: die eingegebenen z. B. 6 %
+ * sind die tatsächliche Jahresrendite, nicht ein nominaler Jahreszins.
+ */
+export const monthlyRate = (annualPct) => Math.pow(1 + annualPct / 100, 1 / 12) - 1;
+
 export const eur0 = new Intl.NumberFormat("de-AT", {
   style: "currency",
   currency: "EUR",
@@ -28,11 +35,13 @@ export const sliderStyle = {
   cursor: "pointer",
 };
 
-export function Field({ label, hint, children, value }) {
+export function Field({ label, hint, children, value, htmlFor }) {
   return (
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-        <label style={{ fontSize: 14, fontWeight: 600, color: SLATE }}>{label}</label>
+        <label htmlFor={htmlFor} style={{ fontSize: 14, fontWeight: 600, color: SLATE }}>
+          {label}
+        </label>
         <span style={{ fontSize: 15, fontWeight: 800, color: CLAY, fontVariantNumeric: "tabular-nums" }}>{value}</span>
       </div>
       {children}
@@ -44,6 +53,8 @@ export function Field({ label, hint, children, value }) {
 export function Toggle({ on, onClick, label }) {
   return (
     <button
+      type="button"
+      aria-pressed={on}
       onClick={onClick}
       style={{
         border: `2px solid ${on ? CLAY : OAT_DEEP}`,
