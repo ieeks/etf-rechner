@@ -28,7 +28,7 @@ export default function App() {
       {/* Tab-Umschalter */}
       <div style={{ maxWidth: 720, margin: "0 auto 22px" }}>
         <div
-          role="tablist"
+          role="group"
           aria-label="Rechner"
           style={{
             display: "flex",
@@ -47,9 +47,8 @@ export default function App() {
                 key={t.id}
                 id={`tab-${t.id}`}
                 type="button"
-                role="tab"
-                aria-selected={active}
-                aria-controls={`panel-${t.id}`}
+                aria-pressed={active}
+                aria-controls="calculator-panel"
                 onClick={() => setTab(t.id)}
                 style={{
                   flex: 1,
@@ -73,7 +72,7 @@ export default function App() {
         </div>
       </div>
 
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+      <div role="region" id="calculator-panel" aria-labelledby={`tab-${tab}`}>
         {tab === "anspar" ? (
           <SparplanRechner state={sparplan} />
         ) : (
