@@ -19,8 +19,8 @@ Interaktiver ETF-Rechner für Österreich mit zwei umschaltbaren Modi: **Anspare
 
 ### Entnehmen (Entnahmeplan-Rechner)
 - **Zwei Modi** — **Kapitalerhalt** (nur den realen Ertrag entnehmen, Substanz bleibt erhalten) und **Kapitalverzehr** (Depot planmäßig über X Jahre aufbrauchen)
-- **Inflationsbereinigt** — alle Auszahlungen in heutiger Kaufkraft; nominale Rate steigt jährlich mit der Inflation
-- **KESt auf den Ertragsanteil** — vereinfachte 27,5-%-Besteuerung der Entnahmen
+- **Inflationsbereinigt** — alle Auszahlungen in heutiger Kaufkraft; die nominale Rate steigt Monat für Monat mit der Inflation
+- **KESt auf den Ertragsanteil** — grobe 27,5-%-Schätzung auf den Ertragsanteil der Entnahmen, keine belastbare Nettoauszahlung
 - **Depotverlauf** — nominal vs. real im Flächendiagramm
 - **Rendite-Szenarien** — mögliche Monatsentnahme bei 4 %, 6 % und 8 % p.a.
 
@@ -67,3 +67,7 @@ Bei jedem Push auf `main` baut GitHub Actions die App und deployt sie automatisc
 ---
 
 > **Hinweis:** Vereinfachte Modellrechnung, keine Anlageberatung. Renditen können negativ sein; vergangene Wertentwicklung ist keine Garantie. Der Sparplan-Rechner berücksichtigt keine Inflation; der Entnahmeplan-Rechner rechnet inflationsbereinigt in heutiger Kaufkraft.
+>
+> **Rechenmodell:** Die eingegebene Rendite ist in beiden Rechnern die *effektive* Jahresrendite; daraus wird der effektive Monatszins gebildet. Die Sparrate wird jeweils am Monatsende eingezahlt, eine Startanlage zu Beginn.
+>
+> **Steuern:** Die KESt-Angaben sind grobe Schätzungen, keine belastbare Nettoauszahlung. Im Sparplan wird vereinfacht einmalig auf den Gesamtgewinn bei Auszahlung gerechnet; im Entnahmeplan fehlt der steuerliche Einstandswert des vorhandenen Depots, und laufende Fondssteuern (ausschüttungsgleiche Erträge) werden nicht simuliert. Standardmäßig zeigen beide Rechner deshalb den Bruttowert.

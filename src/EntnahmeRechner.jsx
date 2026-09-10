@@ -19,15 +19,13 @@ import {
   AMBER,
   KEST,
   eur0,
+  monthlyRate,
   sliderStyle,
   Field,
   Toggle,
   MiniStat,
   Corners,
 } from "./shared.jsx";
-
-// Monatlicher Zinssatz aus Jahresrate
-const monthlyRate = (annualPct) => Math.pow(1 + annualPct / 100, 1 / 12) - 1;
 
 /**
  * Entnahmeplan-Simulation, gerechnet in heutiger Kaufkraft (real).
@@ -50,12 +48,16 @@ function simulateEntnahme({ startCapital, annualReturn, inflation, mode, years }
   // reale Monatsentnahme (heutige Kaufkraft)
   let monthlyReal;
   let sustainable = true;
+  // "gleichstand" = Rendite entspricht der Inflation (kein realer Ertrag, aber
+  // auch kein realer Substanzverlust); "unterdeckung" = Rendite < Inflation.
+  let shortfall = null;
   if (mode === "erhalt") {
     // nur den realen Ertrag entnehmen → reales Kapital bleibt konstant
     monthlyReal = startCapital * iReal;
-    if (iReal <= 0) {
+    if (iReal <= 1e-12) {
       monthlyReal = 0;
-      sustainable = false; // Rendite deckt Inflation nicht → kein realer Ertrag
+      sustainable = false; // kein realer Ertrag → keine reale Entnahme möglich
+      shortfall = iReal < -1e-12 ? "unterdeckung" : "gleichstand";
     }
   } else {
     // Annuität in realen Größen: Depot über `months` auf 0 verzehren
@@ -89,10 +91,14 @@ function simulateEntnahme({ startCapital, annualReturn, inflation, mode, years }
   const endNom = capNom;
   const endReal = endNom / Math.pow(1 + infMonthly, months);
 
-  // KESt vereinfacht auf den Ertragsanteil der Entnahmen.
-  // Kapitalerhalt: Substanz bleibt erhalten → Auszahlungen sind (näherungsweise)
-  // reiner Ertrag → voller KESt-Satz. Kapitalverzehr: nur der Gewinn über dem
-  // eingesetzten Kapital ist steuerpflichtig.
+  // KESt — bewusst nur eine grobe Schätzung, keine belastbare Nettoauszahlung:
+  // Kapitalerhalt: Substanz bleibt erhalten → Auszahlungen gelten (näherungsweise)
+  // als reiner Ertrag → voller KESt-Satz. Kapitalverzehr: der über die gesamte
+  // Laufzeit ermittelte Gewinnanteil wird pauschal auf jede Monatsentnahme gelegt.
+  //
+  // Bekannte Grenzen: der steuerliche Einstandswert des vorhandenen Depots ist
+  // nicht bekannt (bereits aufgelaufene Gewinne im Startkapital bleiben deshalb
+  // unberücksichtigt) und die laufende Fondsbesteuerung wird nicht simuliert.
   let gainShare;
   if (mode === "erhalt") {
     gainShare = 1;
@@ -109,18 +115,42 @@ function simulateEntnahme({ startCapital, annualReturn, inflation, mode, years }
     endNom,
     totalWithdrawnNom,
     sustainable,
+    shortfall,
     series,
     months,
   };
 }
 
-export default function EntnahmeRechner() {
+/**
+ * Eingabestate des Entnahmeplan-Rechners. Wird in App gehalten, damit die
+ * Eingaben einen Tabwechsel überleben.
+ */
+export function useEntnahmeState() {
   const [startCapital, setStartCapital] = useState(300000);
   const [annualReturn, setAnnualReturn] = useState(6);
   const [inflation, setInflation] = useState(2);
   const [years, setYears] = useState(25);
   const [mode, setMode] = useState("erhalt"); // "erhalt" | "verzehr"
-  const [afterTax, setAfterTax] = useState(true);
+  const [afterTax, setAfterTax] = useState(false);
+  return {
+    startCapital, setStartCapital,
+    annualReturn, setAnnualReturn,
+    inflation, setInflation,
+    years, setYears,
+    mode, setMode,
+    afterTax, setAfterTax,
+  };
+}
+
+export default function EntnahmeRechner({ state }) {
+  const {
+    startCapital, setStartCapital,
+    annualReturn, setAnnualReturn,
+    inflation, setInflation,
+    years, setYears,
+    mode, setMode,
+    afterTax, setAfterTax,
+  } = state;
 
   const r = useMemo(
     () => simulateEntnahme({ startCapital, annualReturn, inflation, mode, years }),
@@ -168,10 +198,10 @@ export default function EntnahmeRechner() {
       >
         {/* Modus-Umschalter */}
         <div style={{ marginBottom: 18 }}>
-          <label style={{ fontSize: 14, fontWeight: 600, color: SLATE, display: "block", marginBottom: 8 }}>
+          <div id="en-mode-label" style={{ fontSize: 14, fontWeight: 600, color: SLATE, marginBottom: 8 }}>
             Modus
-          </label>
-          <div style={{ display: "flex", gap: 8 }}>
+          </div>
+          <div role="group" aria-labelledby="en-mode-label" style={{ display: "flex", gap: 8 }}>
             <ModeButton
               active={isErhalt}
               onClick={() => setMode("erhalt")}
@@ -188,11 +218,13 @@ export default function EntnahmeRechner() {
         </div>
 
         <Field
+          htmlFor="en-capital"
           label="Depotwert (Start)"
           value={eur0.format(startCapital)}
           hint="Vorhandenes Vermögen, aus dem entnommen wird"
         >
           <input
+            id="en-capital"
             type="range"
             min={10000}
             max={2000000}
@@ -204,27 +236,36 @@ export default function EntnahmeRechner() {
         </Field>
 
         <Field
+          htmlFor="en-return"
           label="Erwartete Rendite p. a."
           value={`${annualReturn.toLocaleString("de-AT", { minimumFractionDigits: 1 })} %`}
-          hint="Breiter Aktien-ETF historisch ~7–9 %. Konservativ planen: 4–6 %. Keine Garantie."
+          hint="Effektive Jahresrendite. Breiter Aktien-ETF historisch ~7–9 %. Konservativ planen: 4–6 %. Keine Garantie."
         >
-          <input type="range" min={0} max={10} step={0.5} value={annualReturn} onChange={(e) => setAnnualReturn(+e.target.value)} style={sliderStyle} />
+          <input id="en-return" type="range" min={0} max={10} step={0.5} value={annualReturn} onChange={(e) => setAnnualReturn(+e.target.value)} style={sliderStyle} />
         </Field>
 
         <Field
+          htmlFor="en-inflation"
           label="Inflation p. a."
           value={`${inflation.toLocaleString("de-AT", { minimumFractionDigits: 1 })} %`}
           hint="Zieht die Kaufkraft der Auszahlung über die Jahre. EZB-Ziel ~2 %."
         >
-          <input type="range" min={0} max={5} step={0.25} value={inflation} onChange={(e) => setInflation(+e.target.value)} style={sliderStyle} />
+          <input id="en-inflation" type="range" min={0} max={5} step={0.25} value={inflation} onChange={(e) => setInflation(+e.target.value)} style={sliderStyle} />
         </Field>
 
         <Field
+          htmlFor="en-years"
           label={isErhalt ? "Anzeigezeitraum" : "Entnahmedauer"}
           value={`${years} Jahre`}
-          hint={isErhalt ? "Nur zur Darstellung — Depot bleibt real konstant, die Rente läuft unbefristet." : "Nach dieser Zeit ist das Depot planmäßig aufgebraucht (0 €)."}
+          hint={
+            isErhalt
+              ? r.sustainable
+                ? "Nur zur Darstellung — Depot bleibt real konstant, die Rente läuft unbefristet."
+                : "Nur zur Darstellung — bei dieser Rendite ist keine Entnahme mit Kapitalerhalt möglich."
+              : "Nach dieser Zeit ist das Depot planmäßig aufgebraucht (0 €)."
+          }
         >
-          <input type="range" min={5} max={40} step={1} value={years} onChange={(e) => setYears(+e.target.value)} style={sliderStyle} />
+          <input id="en-years" type="range" min={5} max={40} step={1} value={years} onChange={(e) => setYears(+e.target.value)} style={sliderStyle} />
         </Field>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "4px 0 14px" }}>
@@ -256,10 +297,20 @@ export default function EntnahmeRechner() {
             <div style={{ fontSize: 14, color: OAT }}>
               ≈ {eur0.format(shownMonthly * 12)} pro Jahr · in heutiger Kaufkraft
             </div>
+            <div style={{ fontSize: 11.5, color: OAT, lineHeight: 1.45, marginTop: 8, opacity: 0.85 }}>
+              {afterTax
+                ? isErhalt
+                  ? "Grobe Steuerschätzung, keine belastbare Nettoauszahlung: jede Entnahme wird voll als Gewinn versteuert. Bereits im Startdepot enthaltene Anschaffungskosten und laufende Fondssteuern sind nicht berücksichtigt."
+                  : "Grobe Steuerschätzung, keine belastbare Nettoauszahlung: der Gewinnanteil der gesamten Laufzeit wird pauschal auf jede Monatsentnahme gelegt. Der steuerliche Einstandswert des Startdepots ist unbekannt und fehlt in der Rechnung."
+                : "Brutto vor KESt. Der Schalter „nach KESt“ zeigt eine grobe Steuerschätzung — der steuerliche Einstandswert des Startdepots ist dem Rechner nicht bekannt."}
+            </div>
           </>
         ) : (
           <div style={{ fontSize: 20, fontWeight: 700, color: CLAY_SOFT, margin: "10px 0 2px", lineHeight: 1.3 }}>
-            Bei dieser Rendite deckt der Ertrag nicht einmal die Inflation — für echten Kapitalerhalt ist keine Entnahme möglich. Höhere Rendite wählen oder in den Kapitalverzehr wechseln.
+            {r.shortfall === "gleichstand"
+              ? "Rendite und Inflation gleichen sich genau aus — das Depot hält real seinen Wert, wirft darüber hinaus aber nichts ab. Für echten Kapitalerhalt ist keine Entnahme möglich."
+              : "Bei dieser Rendite deckt der Ertrag nicht einmal die Inflation — das Depot verliert real schon ohne Entnahme an Wert."}{" "}
+            Höhere Rendite wählen oder in den Kapitalverzehr wechseln.
           </div>
         )}
 
@@ -268,7 +319,13 @@ export default function EntnahmeRechner() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <MiniStat label="Entnahme brutto / Monat" value={eur0.format(r.monthlyReal)} color={OAT} />
           <MiniStat
-            label={isErhalt ? "Depot real (bleibt)" : `Restwert real nach ${years} J.`}
+            label={
+              isErhalt
+                ? r.sustainable
+                  ? "Depot real (bleibt)"
+                  : `Depot real nach ${years} J.`
+                : `Restwert real nach ${years} J.`
+            }
             value={eur0.format(r.endReal)}
             color={CLAY_SOFT}
           />
@@ -350,7 +407,7 @@ export default function EntnahmeRechner() {
                 background: "#fff",
                 borderRadius: 10,
                 padding: "12px 10px",
-                border: s.pct === Math.round(annualReturn) ? `2px solid ${CLAY}` : `2px solid transparent`,
+                border: s.pct === annualReturn ? `2px solid ${CLAY}` : `2px solid transparent`,
                 textAlign: "center",
               }}
             >
@@ -378,7 +435,7 @@ export default function EntnahmeRechner() {
         <ModeExplain
           active={isErhalt}
           title="Kapitalerhalt"
-          text="Du entnimmst nur den realen Ertrag. Das Vermögen bleibt in heutiger Kaufkraft gleich groß — die Entnahme kann theoretisch unbefristet laufen und du kannst die Substanz vererben. Dafür fällt die Rate niedriger aus."
+          text="Du entnimmst nur den realen Ertrag — also nur das, was die Rendite über der Inflation abwirft. Das Vermögen bleibt in heutiger Kaufkraft gleich groß — die Entnahme kann theoretisch unbefristet laufen und du kannst die Substanz vererben. Dafür fällt die Rate niedriger aus."
         />
         <div style={{ height: 10 }} />
         <ModeExplain
@@ -390,9 +447,11 @@ export default function EntnahmeRechner() {
 
       <p style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.55, margin: 0 }}>
         Vereinfachte Modellrechnung, keine Anlageberatung. Alle Auszahlungen sind in heutiger Kaufkraft angegeben und
-        über die Zeit inflationsbereinigt — die nominale Auszahlung steigt jährlich mit der Inflation. KESt wird
-        vereinfacht mit 27,5 % auf den Ertragsanteil der Entnahmen gerechnet (beim Kapitalerhalt näherungsweise auf die
-        volle Entnahme, da die Substanz nicht angetastet wird). Renditen schwanken stark und können negativ sein; gerade
+        über die Zeit inflationsbereinigt — die nominale Auszahlung steigt Monat für Monat mit der Inflation. Die
+        KESt-Angabe ist eine grobe Schätzung und keine belastbare Nettoauszahlung: gerechnet wird vereinfacht mit
+        27,5 % auf den Ertragsanteil der Entnahmen (beim Kapitalerhalt näherungsweise auf die volle Entnahme, da die
+        Substanz nicht angetastet wird). Der steuerliche Einstandswert des vorhandenen Depots ist dem Rechner nicht
+        bekannt, laufende Fondssteuern werden nicht simuliert. Renditen schwanken stark und können negativ sein; gerade
         in der Entnahmephase kann eine schlechte Börsenphase zu Beginn (Sequence-of-Returns-Risiko) den Plan stärker
         treffen, als eine konstante Durchschnittsrendite vermuten lässt. Vergangene Wertentwicklung ist keine Garantie.
       </p>
@@ -403,6 +462,8 @@ export default function EntnahmeRechner() {
 function ModeButton({ active, onClick, title, sub }) {
   return (
     <button
+      type="button"
+      aria-pressed={active}
       onClick={onClick}
       style={{
         flex: 1,

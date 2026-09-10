@@ -19,6 +19,7 @@ import {
   AMBER,
   KEST,
   eur0,
+  monthlyRate,
   sliderStyle,
   Field,
   Toggle,
@@ -86,9 +87,20 @@ const SATELLITE_ETFS = [
   },
 ];
 
+/**
+ * Sparplan-Simulation.
+ *
+ * Modellannahmen:
+ * - `annualReturn` ist die effektive Jahresrendite; daraus wird der effektive
+ *   Monatszins gebildet (identische Umrechnung wie im Entnahmeplan-Rechner).
+ * - Die Sparrate wird jeweils am Monatsende eingezahlt (nachschüssig), eine
+ *   optionale Startanlage dagegen zu Beginn.
+ * - Ausführungsgebühren werden von der eingegebenen Gesamtrate abgezogen;
+ *   investiert wird nur der Rest.
+ */
 function simulate({ rate, years, annualReturn, feePerExec, plans, lump = 0 }) {
   const months = years * 12;
-  const i = annualReturn / 100 / 12;
+  const i = monthlyRate(annualReturn);
   const monthlyFee = feePerExec * plans;
   const invested = Math.max(0, rate - monthlyFee); // was tatsächlich in den ETF fließt
 
@@ -117,14 +129,39 @@ function simulate({ rate, years, annualReturn, feePerExec, plans, lump = 0 }) {
   return { series, totalPaid, totalInvested, totalFees, endValue, gain, kest, netEnd, months };
 }
 
-export default function SparplanRechner() {
+/**
+ * Eingabestate des Sparplan-Rechners. Wird in App gehalten, damit die Eingaben
+ * einen Tabwechsel überleben (die Rechner selbst werden dabei ausgehängt).
+ */
+export function useSparplanState() {
   const [rate, setRate] = useState(150);
   const [lump, setLump] = useState(0);
   const [years, setYears] = useState(17);
   const [annualReturn, setAnnualReturn] = useState(6);
   const [freeEtf, setFreeEtf] = useState(true);
   const [split, setSplit] = useState(true);
-  const [afterTax, setAfterTax] = useState(true);
+  const [afterTax, setAfterTax] = useState(false);
+  return {
+    rate, setRate,
+    lump, setLump,
+    years, setYears,
+    annualReturn, setAnnualReturn,
+    freeEtf, setFreeEtf,
+    split, setSplit,
+    afterTax, setAfterTax,
+  };
+}
+
+export default function SparplanRechner({ state }) {
+  const {
+    rate, setRate,
+    lump, setLump,
+    years, setYears,
+    annualReturn, setAnnualReturn,
+    freeEtf, setFreeEtf,
+    split, setSplit,
+    afterTax, setAfterTax,
+  } = state;
   const [copied, setCopied] = useState(null);
 
   async function copyIsin(isin) {
@@ -137,9 +174,9 @@ export default function SparplanRechner() {
         document.body.appendChild(ta);
         ta.focus();
         ta.select();
-        document.execCommand("copy");
+        const ok = document.execCommand("copy");
         document.body.removeChild(ta);
-        return true;
+        return ok;
       } catch (_) {
         return false;
       }
@@ -208,14 +245,16 @@ export default function SparplanRechner() {
           }}
         >
           <Field
+            htmlFor="sp-rate"
             label="Sparrate gesamt"
             value={`${eur0.format(rate)} / Monat`}
             hint={split ? `${eur0.format(rate / 2)} pro Kind · 2 Sparpläne` : "1 Sparplan"}
           >
-            <input type="range" min={25} max={2000} step={25} value={rate} onChange={(e) => setRate(+e.target.value)} style={sliderStyle} />
+            <input id="sp-rate" type="range" min={25} max={2000} step={25} value={rate} onChange={(e) => setRate(+e.target.value)} style={sliderStyle} />
           </Field>
 
           <Field
+            htmlFor="sp-lump"
             label="Einmalige Startanlage"
             value={eur0.format(lump)}
             hint={
@@ -226,19 +265,20 @@ export default function SparplanRechner() {
                 : "einmalig zu Beginn investiert"
             }
           >
-            <input type="range" min={0} max={500000} step={5000} value={lump} onChange={(e) => setLump(+e.target.value)} style={sliderStyle} />
+            <input id="sp-lump" type="range" min={0} max={500000} step={5000} value={lump} onChange={(e) => setLump(+e.target.value)} style={sliderStyle} />
           </Field>
 
-          <Field label="Laufzeit" value={`${years} Jahre`} hint="Zeithorizont bis zur Auszahlung / Schenkung">
-            <input type="range" min={5} max={30} step={1} value={years} onChange={(e) => setYears(+e.target.value)} style={sliderStyle} />
+          <Field htmlFor="sp-years" label="Laufzeit" value={`${years} Jahre`} hint="Zeithorizont bis zur Auszahlung / Schenkung">
+            <input id="sp-years" type="range" min={5} max={30} step={1} value={years} onChange={(e) => setYears(+e.target.value)} style={sliderStyle} />
           </Field>
 
           <Field
+            htmlFor="sp-return"
             label="Erwartete Rendite p. a."
             value={`${annualReturn.toLocaleString("de-AT", { minimumFractionDigits: 1 })} %`}
-            hint="Breiter Aktien-ETF historisch ~7–9 %. Konservativ planen: 4–6 %. Keine Garantie."
+            hint="Effektive Jahresrendite. Breiter Aktien-ETF historisch ~7–9 %. Konservativ planen: 4–6 %. Keine Garantie."
           >
-            <input type="range" min={0} max={10} step={0.5} value={annualReturn} onChange={(e) => setAnnualReturn(+e.target.value)} style={sliderStyle} />
+            <input id="sp-return" type="range" min={0} max={10} step={0.5} value={annualReturn} onChange={(e) => setAnnualReturn(+e.target.value)} style={sliderStyle} />
           </Field>
 
           {/* Toggles */}
@@ -273,6 +313,14 @@ export default function SparplanRechner() {
               ≈ {eur0.format(perChild)} pro Kind
             </div>
           )}
+          <div style={{ fontSize: 11.5, color: OAT, lineHeight: 1.45, marginTop: 8, opacity: 0.85 }}>
+            {afterTax
+              ? "Grobe Steuerschätzung: 27,5 % KESt einmalig auf den gesamten Gewinn bei Auszahlung. Laufend anfallende Fondssteuern (ausschüttungsgleiche Erträge) sind nicht simuliert."
+              : "Vor Steuer. Bei Auszahlung fällt KESt auf den Gewinn an — Schalter „nach KESt“ zeigt eine grobe Schätzung."}
+          </div>
+          <div style={{ fontSize: 11.5, color: OAT, lineHeight: 1.45, marginTop: 6, opacity: 0.7 }}>
+            Modell: Sparrate am Monatsende, {annualReturn.toLocaleString("de-AT", { minimumFractionDigits: 1 })} % effektive Jahresrendite.
+          </div>
 
           <div style={{ height: 1, background: "rgba(255,255,255,0.14)", margin: "18px 0" }} />
 
@@ -358,7 +406,7 @@ export default function SparplanRechner() {
                   background: "#fff",
                   borderRadius: 10,
                   padding: "12px 10px",
-                  border: s.pct === Math.round(annualReturn) ? `2px solid ${CLAY}` : `2px solid transparent`,
+                  border: s.pct === annualReturn ? `2px solid ${CLAY}` : `2px solid transparent`,
                   textAlign: "center",
                 }}
               >

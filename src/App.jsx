@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { CLAY, SLATE, IVORY, OAT_DEEP, MUTED } from "./shared.jsx";
-import SparplanRechner from "./SparplanRechner.jsx";
-import EntnahmeRechner from "./EntnahmeRechner.jsx";
+import SparplanRechner, { useSparplanState } from "./SparplanRechner.jsx";
+import EntnahmeRechner, { useEntnahmeState } from "./EntnahmeRechner.jsx";
 
 const TABS = [
   { id: "anspar", label: "Ansparen", sub: "Vermögen aufbauen" },
@@ -10,6 +10,10 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState("anspar");
+  // Eingabestate liegt hier, nicht in den Rechnern: die Tabs rendern bedingt,
+  // lokaler State ginge beim Umschalten verloren.
+  const sparplan = useSparplanState();
+  const entnahme = useEntnahmeState();
 
   return (
     <div
@@ -24,6 +28,8 @@ export default function App() {
       {/* Tab-Umschalter */}
       <div style={{ maxWidth: 720, margin: "0 auto 22px" }}>
         <div
+          role="tablist"
+          aria-label="Rechner"
           style={{
             display: "flex",
             gap: 6,
@@ -39,6 +45,11 @@ export default function App() {
             return (
               <button
                 key={t.id}
+                id={`tab-${t.id}`}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-controls={`panel-${t.id}`}
                 onClick={() => setTab(t.id)}
                 style={{
                   flex: 1,
@@ -62,7 +73,13 @@ export default function App() {
         </div>
       </div>
 
-      {tab === "anspar" ? <SparplanRechner /> : <EntnahmeRechner />}
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        {tab === "anspar" ? (
+          <SparplanRechner state={sparplan} />
+        ) : (
+          <EntnahmeRechner state={entnahme} />
+        )}
+      </div>
     </div>
   );
 }
